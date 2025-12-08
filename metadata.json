@@ -1,0 +1,5 @@
+{
+  "name": "Powerful Carousel Generator",
+  "description": "Generate visual social media carousels from text descriptions using Gemini 2.5 Flash models for text parsing and image generation.",
+  "requestFramePermissions": []
+}
