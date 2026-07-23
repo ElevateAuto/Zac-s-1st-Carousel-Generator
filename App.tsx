@@ -1,85 +1,31 @@
+
 import React, { useState, useEffect } from 'react';
-import { SlideData, GenerationStatus, AspectRatio, ImageResolution, ImageSettings, VisualStyle } from './types';
+import { SlideData, GenerationStatus, AspectRatio, ImageResolution, ImageSettings, VisualStyle, TextDensity } from './types';
 import { parseSlidesFromText, generateSlideImage, editSlideImage, refineText, generateScriptFromTopic, generateSlideVideo } from './services/geminiService';
 import { SlideCard } from './components/SlideCard';
-import { Sparkles, RotateCcw, Copy, Check, Grid, Columns, FileArchive, FileText, Wand2, Settings2, X, Send, PenTool, Lightbulb, Key } from 'lucide-react';
+import { Sparkles, RotateCcw, Copy, Check, Grid, Columns, FileArchive, FileText, Wand2, Settings2, X, Send, PenTool, Lightbulb, Key, Film, AlignLeft } from 'lucide-react';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 
-const SAMPLE_TEXT = `SLIDE 1 (The Hook)
-
+const SAMPLE_TEXT = `SLIDE 1
 Headline: Your Children Don't Want Your Success
-
 Subtext: They are starving for the one thing you’re too busy to give.
-
+Caption: Many fathers believe that financial success is the ultimate gift they can give their children. But in reality, what children crave most is not your money, but your time. Success is hollow if you are a stranger in your own home.
 Visual Directive: Black and white photo of a small child looking up at a father who is looking at his phone. High contrast, moody lighting.
 
 SLIDE 2
-
 Headline: Provision Without Presence Is Empty
-
-Subtext: A full bank account never replaces an empty chair at the dinner table.
-
+Subtext: A full bank account never replaces an empty chair.
+Caption: You can buy them the best toys, the best schools, and the best clothes. But you cannot buy memories. An empty chair at the dinner table speaks louder than any paycheck. Presence is the highest form of provision.
 Visual Directive: An empty chair at a family dining table with warm light spilling onto it from a window. Cinematic style.
 
 SLIDE 3
-
 Headline: They Watch Your Life, Not Lectures
-
-Subtext: Your kids learn resilience from how you live, not what you say.
-
-Visual Directive: Close up of a father tying his shoes or fixing a tool, with a child’s hands mimicking the action nearby.
-
-SLIDE 4
-
-Headline: The Magic Is In The Mundane
-
-Subtext: Character is built during car rides and pancakes, not just at graduations.
-
-Visual Directive: A candid, slightly blurry "motion" shot of a father and child laughing over a messy breakfast table. Warm, golden hour tones.
-
-SLIDE 5
-
-Headline: Stop Waiting For It To Get Easier
-
-Subtext: If you can't find joy in this chaotic season, you will miss their childhood.
-
-Visual Directive: An hourglass on a wooden desk, sand running low. Soft focus background of a child’s toy left on the floor.
-
-SLIDE 6
-
-Headline: Your Imperfection Is A Teaching Tool
-
-Subtext: Owning your mistakes teaches them more about integrity than pretending you are perfect.
-
-Visual Directive: A father kneeling down to be eye-level with a child, hand on their shoulder, looking sincere and apologetic.
-
-SLIDE 7
-
-Headline: Choose The Relationship Over The Resume
-
-Subtext: You are replaceable at work. You are irreplaceable at home.
-
-Visual Directive: Split screen graphic: Left side is a blurred office laptop; Right side is a sharp, bright image of a child holding a father's hand.
-
-SLIDE 8 (The CTA)
-
-Headline: The Window Of Influence Is Closing
-
-Subtext: Put the phone down. Show up today. Build a legacy that lasts. Call to Action: Share this with a father who needs to hear this today.
-
-Visual Directive: Minimalist text on a dark, textured background.
-
-SLIDE 9 (Join the Proving Grounds)
-
-HEADLINE: Be Present Today
-
-Subtext: Join others being present for ourselves and our kids. https://www.skool.com/epic-dad-life-of-excellence-5103
-
-Visual Directive: Minimalist text on a dark, textured background.`;
+Subtext: Your kids learn resilience from how you live.
+Caption: Children are mimics. They don't do what you say; they do what you do. If you want them to be resilient, honest, and kind, you must embody those traits yourself. Your life is the curriculum.
+Visual Directive: Close up of a father tying his shoes or fixing a tool, with a child’s hands mimicking the action nearby.`;
 
 const App: React.FC = () => {
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [inputText, setInputText] = useState<string>('');
   const [topicInput, setTopicInput] = useState<string>('');
   const [slides, setSlides] = useState<SlideData[]>([]);
@@ -87,10 +33,11 @@ const App: React.FC = () => {
   const [hasCopied, setHasCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'carousel' | 'grid'>('carousel');
   const [isDownloading, setIsDownloading] = useState(false);
-  
+
   // Settings State
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('cinematic');
+  const [textDensity, setTextDensity] = useState<TextDensity>('standard');
   const resolution: ImageResolution = '1K';
 
   // Edit State
@@ -101,34 +48,9 @@ const App: React.FC = () => {
   const [isRefining, setIsRefining] = useState(false);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
-  useEffect(() => {
-    const checkApiKey = async () => {
-      if (window.aistudio && await window.aistudio.hasSelectedApiKey()) {
-        setHasApiKey(true);
-      }
-    };
-    checkApiKey();
-  }, []);
-
-  const handleSelectKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      // Assume success and proceed to mitigate race conditions
-      setHasApiKey(true);
-    }
-  };
-
   const handleApiError = (error: any) => {
-    const errorMsg = error.toString().toLowerCase();
-    const status = error.status || error.response?.status;
-    
-    // Check for Permission Denied (403) or "Requested entity was not found"
-    if (status === 403 || errorMsg.includes('permission denied') || errorMsg.includes('requested entity was not found')) {
-      setHasApiKey(false);
-      setStatus({ step: 'error', message: 'API permission denied. Please select a valid API key with billing enabled.' });
-    } else {
-      setStatus({ step: 'error', message: 'Something went wrong. Please try again.' });
-    }
+    const errorMsg = error.message || error.toString();
+    setStatus({ step: 'error', message: errorMsg || 'Something went wrong. Please try again.' });
   };
 
   const handleCopySample = () => {
@@ -141,7 +63,7 @@ const App: React.FC = () => {
     if (!inputText.trim()) return;
     setIsRefining(true);
     try {
-      const refined = await refineText(inputText);
+      const refined = await refineText(inputText, textDensity);
       setInputText(refined);
     } catch (e: any) {
       console.error("Refine failed", e);
@@ -155,7 +77,7 @@ const App: React.FC = () => {
     if (!topicInput.trim()) return;
     setIsGeneratingScript(true);
     try {
-      const script = await generateScriptFromTopic(topicInput);
+      const script = await generateScriptFromTopic(topicInput, textDensity);
       setInputText(script);
     } catch (e: any) {
       console.error("Script generation failed", e);
@@ -268,7 +190,7 @@ const App: React.FC = () => {
     
     try {
       // Use current app aspect ratio setting
-      const videoUrl = await generateSlideVideo(directive, aspectRatio);
+      const videoUrl = await generateSlideVideo(directive, aspectRatio, visualStyle);
       setSlides(prev => prev.map(s => 
         s.id === id 
           ? { ...s, videoUrl: videoUrl, isGeneratingVideo: false }
@@ -283,6 +205,26 @@ const App: React.FC = () => {
       ));
       handleApiError(error);
     }
+  };
+  
+  const generateAllVideos = async () => {
+    if (slides.length === 0) return;
+    setStatus({ step: 'generating_videos', message: 'Generating videos for all slides...', progress: 0 });
+    
+    // Process one by one to avoid rate limits
+    for (let i = 0; i < slides.length; i++) {
+        const slide = slides[i];
+        if (slide.videoUrl) continue; // Skip if already exists
+        
+        await handleGenerateVideo(slide.id, slide.visualDirective);
+        setStatus(prev => ({
+           ...prev,
+           progress: Math.round(((i + 1) / slides.length) * 100),
+           message: `Generated video ${i + 1} of ${slides.length}`
+        }));
+    }
+    
+    setStatus({ step: 'complete', message: 'All videos generated!' });
   };
 
   const openEditModal = (id: number) => {
@@ -354,43 +296,8 @@ const App: React.FC = () => {
         const bottomPadding = img.height * 0.08;
         let currentY = img.height - bottomPadding;
 
-        // 4. Draw Subtext (Bottom Up)
-        if (subtext) {
-          const subFontSize = img.width * 0.045; // ~4.5% of width
-          ctx.font = `500 ${subFontSize}px Inter, sans-serif`;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.shadowColor = 'rgba(0,0,0,0.8)';
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
-
-          const words = subtext.split(' ');
-          let line = '';
-          const lines = [];
-          for(let n = 0; n < words.length; n++) {
-            const testLine = line + words[n] + ' ';
-            const metrics = ctx.measureText(testLine);
-            const testWidth = metrics.width;
-            if (testWidth > img.width - (margin * 2) && n > 0) {
-              lines.push(line);
-              line = words[n] + ' ';
-            } else {
-              line = testLine;
-            }
-          }
-          lines.push(line);
-
-          // Draw lines bottom up
-          const lineHeight = subFontSize * 1.4;
-          // Move Y up by total height of subtext
-          currentY -= (lines.length * lineHeight);
-          
-          lines.forEach((l, i) => {
-            ctx.fillText(l, margin, currentY + (i * lineHeight));
-          });
-          
-          currentY -= (lineHeight * 0.8); // Spacing between subtext and headline
-        }
+        // 4. Draw Subtext (Bottom Up) - REMOVED per user request
+        // if (subtext) { ... }
 
         // 5. Draw Headline (Above Subtext)
         if (headline) {
@@ -439,10 +346,18 @@ const App: React.FC = () => {
     try {
       const zip = new JSZip();
       let addedCount = 0;
+      let allCaptions = "CAROUSEL CAPTIONS\n\n";
       
       // Process slides sequentially to avoid memory spikes or heavy canvas usage all at once
       for (let i = 0; i < slides.length; i++) {
         const slide = slides[i];
+        
+        // Add to caption text file
+        allCaptions += `SLIDE ${i + 1}\n`;
+        allCaptions += `HEADLINE: ${slide.headline}\n`;
+        if (slide.subtext) allCaptions += `SUBTEXT: ${slide.subtext}\n`;
+        allCaptions += `CAPTION: ${slide.caption}\n\n`;
+
         try {
           if (slide.imageUrl) {
             // "Bake" the text onto the image
@@ -454,6 +369,14 @@ const App: React.FC = () => {
               zip.file(`slide-${i + 1}.png`, base64Data, { base64: true });
               addedCount++;
             }
+          }
+          // Also include video if present
+          if (slide.videoUrl) {
+              // videoUrl is a blob URL. We need to fetch the blob data.
+              const response = await fetch(slide.videoUrl);
+              const blob = await response.blob();
+              zip.file(`slide-${i + 1}.mp4`, blob);
+              addedCount++;
           }
         } catch (err) {
           console.error(`Error processing slide ${i + 1}`, err);
@@ -467,6 +390,9 @@ const App: React.FC = () => {
           }
         }
       }
+
+      // Add the captions file
+      zip.file("captions.txt", allCaptions);
 
       if (addedCount === 0) {
         alert("No valid images found to download.");
@@ -505,11 +431,16 @@ const App: React.FC = () => {
         case '16:9': pdfHeight = 608; break;
         case '1:1': default: pdfHeight = 1080; break;
       }
+      
+      // We will make the PDF page taller to accommodate the caption below the image
+      // Let's add 400px of space below for the caption text.
+      const captionSpace = 400;
+      const totalPageHeight = pdfHeight + captionSpace;
 
       const doc = new jsPDF({
-        orientation: pdfHeight > pdfWidth ? "portrait" : "landscape",
+        orientation: totalPageHeight > pdfWidth ? "portrait" : "landscape",
         unit: "px",
-        format: [pdfWidth, pdfHeight]
+        format: [pdfWidth, totalPageHeight]
       });
 
       let pagesAdded = 0;
@@ -517,18 +448,15 @@ const App: React.FC = () => {
       for (let i = 0; i < slides.length; i++) {
         const slide = slides[i];
         if (slide.imageUrl) {
-          if (pagesAdded > 0) doc.addPage([pdfWidth, pdfHeight]);
+          if (pagesAdded > 0) doc.addPage([pdfWidth, totalPageHeight]);
           
           try {
-            // For 4:5, we might receive 3:4 images (1080x1440) which are taller than 4:5 (1080x1350).
-            // 'FAST' compression handles the scaling/cropping implicitly by stretching if not sliced.
+            // Draw Image
             doc.addImage(slide.imageUrl, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
             
-            // Text Configuration
+            // --- DRAW SLIDE OVERLAY TEXT (Headline + Subtext) ---
             const margin = 60;
             const maxTextWidth = pdfWidth - (margin * 2);
-            
-            // Position text at the bottom area (approx 75% down the page)
             let currentTextY = pdfHeight * 0.75;
             
             // Headline
@@ -536,36 +464,54 @@ const App: React.FC = () => {
               const fontSize = Math.min(60, pdfWidth * 0.055);
               doc.setFont("helvetica", "bold");
               doc.setFontSize(fontSize);
-              
               const lines = doc.splitTextToSize(slide.headline, maxTextWidth);
-              
-              // Drop Shadow (Black offset)
-              doc.setTextColor(0, 0, 0);
+              doc.setTextColor(0, 0, 0); // Shadow
               doc.text(lines, margin + 2, currentTextY + 2);
-              
-              // Main Text (White)
-              doc.setTextColor(255, 255, 255);
+              doc.setTextColor(255, 255, 255); // Text
               doc.text(lines, margin, currentTextY);
-              
               const lineHeight = fontSize * 1.15;
               currentTextY += (lines.length * lineHeight) + 20; 
             }
             
-            // Subtext
-            if (slide.subtext) {
-              const fontSize = Math.min(36, pdfWidth * 0.035);
-              doc.setFont("helvetica", "normal");
-              doc.setFontSize(fontSize);
-              
-              const lines = doc.splitTextToSize(slide.subtext, maxTextWidth);
-              
-              // Drop Shadow
-              doc.setTextColor(0, 0, 0);
-              doc.text(lines, margin + 2, currentTextY + 2);
-              
-              // Main Text
-              doc.setTextColor(255, 255, 255);
-              doc.text(lines, margin, currentTextY);
+            // Subtext (Short) - REMOVED from overlay
+            // if (slide.subtext) { ... }
+
+            // --- DRAW CAPTION TEXT (Below Image) ---
+            // Background for caption area
+            doc.setFillColor(23, 23, 23); // Dark background like app
+            doc.rect(0, pdfHeight, pdfWidth, captionSpace, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("times", "normal"); // Serif for readability
+            doc.setFontSize(24);
+            
+            const captionMargin = 40;
+            const captionMaxWidth = pdfWidth - (captionMargin * 2);
+            let captionY = pdfHeight + 60;
+            
+            // Label
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(18);
+            doc.setTextColor(234, 88, 12); // Orange
+            doc.text("CAPTION CONTEXT", captionMargin, captionY);
+            captionY += 30;
+
+            // Content
+            if (slide.caption || slide.subtext) {
+               doc.setFont("times", "normal");
+               doc.setFontSize(24);
+               doc.setTextColor(226, 232, 240); // Slate 200
+               
+               let fullCaption = "";
+               if (slide.subtext) fullCaption += slide.subtext + "\n\n";
+               if (slide.caption) fullCaption += slide.caption;
+
+               const captionLines = doc.splitTextToSize(fullCaption, captionMaxWidth);
+               doc.text(captionLines, captionMargin, captionY);
+            } else {
+               doc.setFont("times", "italic");
+               doc.setTextColor(100, 100, 100);
+               doc.text("No caption provided.", captionMargin, captionY);
             }
 
             pagesAdded++;
@@ -591,53 +537,6 @@ const App: React.FC = () => {
     setInputText('');
     setTopicInput('');
   };
-
-  // --------------------------------------------------------------------------
-  // API KEY SELECTION SCREEN
-  // --------------------------------------------------------------------------
-  if (!hasApiKey) {
-    return (
-      <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4 relative overflow-hidden">
-        
-        {/* Ambient Glows */}
-        <div className="absolute top-[-20%] left-[-20%] w-[50%] h-[50%] bg-orange-600/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[-20%] w-[50%] h-[50%] bg-orange-900/20 rounded-full blur-[150px]" />
-
-        <div className="bg-neutral-900/80 backdrop-blur-xl max-w-md w-full rounded-2xl shadow-2xl border border-neutral-800 p-8 space-y-6 text-center relative z-10">
-          <div className="w-16 h-16 bg-neutral-800 rounded-2xl flex items-center justify-center mx-auto text-orange-500 ring-1 ring-orange-500/20">
-            <Key className="w-8 h-8" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-white tracking-tight">Access Powerful Generator</h1>
-            <p className="text-neutral-400">
-              Connect your Google Cloud Project to access professional-grade Gemini 3 Pro vision models.
-            </p>
-          </div>
-          
-          <button
-            onClick={handleSelectKey}
-            className="w-full flex items-center justify-center space-x-2 bg-orange-600 hover:bg-orange-500 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-orange-500/20"
-          >
-            <Sparkles className="w-5 h-5 text-white/90" />
-            <span>Connect API Key</span>
-          </button>
-
-          <p className="text-xs text-neutral-500">
-            Billing enabled project required for Pro models.
-            <br/>
-            <a 
-              href="https://ai.google.dev/gemini-api/docs/billing" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="underline hover:text-orange-400 transition-colors"
-            >
-              Learn about billing
-            </a>
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   // --------------------------------------------------------------------------
   // MAIN APP
@@ -778,7 +677,7 @@ const App: React.FC = () => {
                      <select 
                         value={aspectRatio}
                         onChange={(e) => setAspectRatio(e.target.value as AspectRatio)}
-                        className="bg-neutral-900 border border-neutral-700 text-slate-200 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-40 p-2.5"
+                        className="bg-neutral-900 border border-neutral-700 text-slate-200 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-32 p-2.5"
                       >
                         <option value="1:1">Square (1:1)</option>
                         <option value="4:5">Portrait (4:5)</option>
@@ -798,7 +697,7 @@ const App: React.FC = () => {
                      <select 
                       value={visualStyle}
                       onChange={(e) => setVisualStyle(e.target.value as VisualStyle)}
-                      className="bg-neutral-900 border border-neutral-700 text-slate-200 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-40 p-2.5"
+                      className="bg-neutral-900 border border-neutral-700 text-slate-200 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-32 p-2.5"
                     >
                       <option value="cinematic">Cinematic</option>
                       <option value="minimalist">Minimalist</option>
@@ -807,6 +706,23 @@ const App: React.FC = () => {
                       <option value="watercolor">Watercolor</option>
                       <option value="noir">Film Noir</option>
                       <option value="anime">Anime Style</option>
+                    </select>
+                   </div>
+                   
+                   {/* Text Density Selector */}
+                   <div className="group relative">
+                     <div className="flex items-center space-x-2 mb-1.5">
+                        <AlignLeft className="w-3 h-3 text-orange-500" />
+                        <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Caption Detail</span>
+                     </div>
+                     <select 
+                      value={textDensity}
+                      onChange={(e) => setTextDensity(e.target.value as TextDensity)}
+                      className="bg-neutral-900 border border-neutral-700 text-slate-200 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-36 p-2.5"
+                    >
+                      <option value="brief">Brief</option>
+                      <option value="standard">Standard</option>
+                      <option value="detailed">Detailed</option>
                     </select>
                    </div>
                 </div>
@@ -863,6 +779,15 @@ const App: React.FC = () => {
               </h3>
 
               <div className="flex items-center space-x-3">
+                 <button
+                    onClick={generateAllVideos}
+                    disabled={status.step === 'generating_videos'}
+                    className="flex items-center space-x-2 px-4 py-2 text-sm font-medium bg-neutral-800 text-neutral-300 hover:bg-orange-600 hover:text-white rounded-lg border border-neutral-700 hover:border-orange-500 transition-colors disabled:opacity-50 mr-2"
+                  >
+                  {status.step === 'generating_videos' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Film className="w-4 h-4" />}
+                  <span>Generate All Videos</span>
+                </button>
+
                 <div className="flex bg-neutral-800 p-1 rounded-lg border border-neutral-700">
                   <button
                     onClick={() => setViewMode('carousel')}

@@ -1,5 +1,8 @@
 {
   "name": "Powerful Carousel Generator",
-  "description": "Generate visual social media carousels from text descriptions using Gemini 2.5 Flash models for text parsing and image generation.",
-  "requestFramePermissions": []
+  "description": "Generate visual social media carousels from text descriptions using Gemini 3.6 Flash for text parsing, Gemini 3.1 Flash Image for visuals, and Veo 3.1 for video generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
